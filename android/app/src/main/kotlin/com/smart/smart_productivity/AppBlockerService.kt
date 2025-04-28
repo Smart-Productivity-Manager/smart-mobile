@@ -160,24 +160,35 @@ class AppBlockerService : Service() {
                     // Tenter de tuer le processus principal
                     activityManager.killBackgroundProcesses(packageName)
     
-                    // Forcer l'arrêt complet avec un délai
-                    try {
-                        val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-                        am.killBackgroundProcesses(packageName)
-                        Thread.sleep(500)
-                        am.killBackgroundProcesses(packageName)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Erreur lors de la tentative de forcer l'arrêt : ${e.message}")
+                    // Sur Android 10+, utiliser une approche différente
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        Log.d(TAG, "Utilisation de la méthode de blocage pour Android 10+")
+                        
+                        // Afficher une activité de blocage par-dessus l'application
+                        val blockIntent = Intent(this, BlockerActivity::class.java)
+                        blockIntent.putExtra("blocked_package", packageName)
+                        blockIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        startActivity(blockIntent)
+                    } else {
+                        // Méthode classique pour les versions antérieures
+                        try {
+                            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                            am.killBackgroundProcesses(packageName)
+                            Thread.sleep(500)
+                            am.killBackgroundProcesses(packageName)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Erreur lors de la tentative de forcer l'arrêt : ${e.message}")
+                        }
+    
+                        // Retourner à l'écran d'accueil
+                        val homeIntent = Intent(Intent.ACTION_MAIN)
+                        homeIntent.addCategory(Intent.CATEGORY_HOME)
+                        homeIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        startActivity(homeIntent)
                     }
     
-                    // Retourner à l'écran d'accueil
-                    val homeIntent = Intent(Intent.ACTION_MAIN)
-                    homeIntent.addCategory(Intent.CATEGORY_HOME)
-                    homeIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    startActivity(homeIntent)
-    
                     // Ajouter un délai pour éviter le redémarrage immédiat
-                    Thread.sleep(2000)
+                    Thread.sleep(1000)
                 } else {
                     Log.e(TAG, "Permission KILL_BACKGROUND_PROCESSES non accordée")
                 }
